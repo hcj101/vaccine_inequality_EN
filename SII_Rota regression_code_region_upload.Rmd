@@ -1,0 +1,289 @@
+---
+title: '**Rotavirus vaccine uptake by deprivation in England (regression)**'
+author: "Aidan Flatt; Dan Hungerford; David Taylor-Robinson"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r echo=FALSE, error=FALSE, message=FALSE, warning=FALSE, results='hide'}
+rm(list=ls())
+
+library(readr)
+library(devtools)
+library(data.table) 
+library(lme4)
+library(sp)
+library(stringr)
+library(dplyr)
+library(knitr)     
+library(kableExtra) 
+library(tidyverse)
+
+```
+
+```{r echo=FALSE, error=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+#read COVER quarterly vaccine data combined
+# original source of data https://www.gov.uk/government/collections/vaccine-uptake#cover-of-vaccination-evaluated-rapidly-programme. Must been cleaned first-cleaned data available from authors on request.
+data <- read_csv("GP rota merge length ways.csv")
+data <- data[,c(2,3,4,5,6,7)]
+names(data)[2] <- "Practice_code"
+
+#lookup file for Local authorities to regional health geographies
+# original source file from https://digital.nhs.uk/services/organisation-data-service/export-data-files/csv-downloads/non-nhs-organisations - file name lauth.csv
+LAReg <- read_csv("lauth.csv")
+
+#Read in deprivation data
+# original source of data Office for Health Improvement & Disparities.  https://fingertips.phe.org.uk/search/deprivation
+deprivation_data <- read_csv("GP codes with deprivation.csv")
+names(deprivation_data)[2] <- "Practice_code"
+names(deprivation_data)[3] <- "Practice_name"
+names(deprivation_data)[5] <- "IMD_2019_score"
+names(deprivation_data)[6] <- "IMD_decile"
+deprivation_data <- deprivation_data[,c(2,3,5,6)]
+
+
+merged_data <- merge(data, deprivation_data, by = "Practice_code", all.x = TRUE)
+
+merged_data <- merged_data %>%
+  mutate('Quarter_number' = case_when(
+    Date_quarter == "Apr19Jun19" ~ "01",
+    Date_quarter == "Jul19Sep19" ~ "02",
+    Date_quarter == "Oct19Dec19" ~ "03",
+    Date_quarter == "Jan20Mar20" ~ "04",
+    Date_quarter == "Apr20Jun20" ~ "05",
+    Date_quarter == "Jul20Sep20" ~ "06",
+    Date_quarter == "Oct20Dec20" ~ "07",
+    Date_quarter == "Jan21Mar21" ~ "08",
+    Date_quarter == "Apr21Jun21" ~ "09",
+    Date_quarter == "Jul21Sep21" ~ "10",
+    Date_quarter == "Oct21Dec21" ~ "11",
+    Date_quarter == "Jan22Mar22" ~ "12",
+    Date_quarter == "Apr22Jun22" ~ "13",
+    Date_quarter == "Jul22Sep22" ~ "14",
+    Date_quarter == "Oct22Dec22" ~ "15",
+    Date_quarter == "Jan23Mar23" ~ "16",
+    TRUE ~ Date_quarter
+  ))
+
+class(merged_data$`Quarter_number`)
+merged_data$`Quarter_number` <- as.numeric(merged_data$`Quarter_number`)
+
+##Make new column with numerators to allow to undertake weighted mean:
+merged_data$Vacc_numerator <- merged_data$`12m Denom` * (merged_data$`Rotavacc% 12m` /100)
+
+merged_data <- merge(merged_data, LAReg, by.x = "ODS Upper Tier LA Code", by.y="Organisation Code", all.x = TRUE)
+
+unmergedgeog<-merged_data[is.na(merged_data$`National Grouping`),]
+
+##remove excess row
+merged_data<-subset(merged_data, Practice_code!=0)
+
+## Starting GPs
+countGP<-merged_data %>% group_by(Quarter_number,`ODS Upper Tier LA Code`) %>% summarise(nGPs=n(), denom_12m=sum(`12m Denom`,na.rm = T))
+
+countGP_start<-countGP %>% group_by(Quarter_number) %>% summarise(StartnGPs=sum(nGPs),Start_Denom_12m=sum(denom_12m))
+
+merged_data<-subset(merged_data, !is.na(`ODS Upper Tier LA Code`))
+
+## Unknown LA code and no assigned GP
+countGP<-merged_data %>% group_by(Quarter_number,`ODS Upper Tier LA Code`) %>% summarise(nGPs=n(), denom_12m=sum(`12m Denom`,na.rm = T))
+
+countGP_rm_unknown<-countGP %>% group_by(Quarter_number) %>% summarise(Rm_unknown_GPs=sum(nGPs),Rm_unknown_GPs_Denom_12m=sum(denom_12m))
+
+## remove missing deprivation data GPs
+merged_data<-subset(merged_data,!is.na(IMD_decile))
+
+countGP_dep<- merged_data %>% group_by(Quarter_number,`ODS Upper Tier LA Code`) %>% summarise(nGPs=n(), denom_12m=sum(`12m Denom`,na.rm = T))
+
+countGP_rm_dep<-countGP_dep %>% group_by(Quarter_number) %>% summarise(No_dep_rm_N_GPs=sum(nGPs),No_dep_rm_N_Denom_12m=sum(denom_12m))
+
+##Remove LAs (Isle of Scilly 906, City of London 714)
+merged_data <- merged_data %>%
+  filter(!`ODS Upper Tier LA Code` %in% c(906, 714))
+
+countGP_city_silly<-countGP_dep %>% filter(!`ODS Upper Tier LA Code` %in% c(906, 714))
+
+countGP_sums_after_excludes<-countGP_city_silly %>% group_by(Quarter_number) %>% summarise(Final_TotnGPs=sum(nGPs),Final_Denom_12m=sum(denom_12m))
+
+## remove rota count
+countGP_rota<-countGP_dep %>% filter(!`ODS Upper Tier LA Code` %in% c(906, 714, 209, 805))
+
+countGP_sums_after_rota_excludes<-countGP_rota %>% group_by(Quarter_number) %>% summarise(Final_TotnGPs=sum(nGPs),Final_Denom_12m=sum(denom_12m))
+
+
+exclude_numbers<-cbind(countGP_start,countGP_rm_unknown[,c(2:3)],countGP_rm_dep[,c(2:3)],countGP_sums_after_excludes[,c(2:3)], countGP_sums_after_rota_excludes[,c(2:3)])
+
+write.csv(exclude_numbers,"Patient_flowchart_rota_12m.csv")
+##Remove LAs (Isle of Scilly 906, City of London 714)
+##Additionally for rota remove Surrey 805 and Bradford 209, data derived anomaly
+
+merged_data <- merged_data %>%
+  filter(!`ODS Upper Tier LA Code` %in% c(209, 805))
+
+```
+
+#Creating a new df where the weighted_deprivation_rank is created to assess the SII. GP practices are first ranked in order of IMD for each quarter. The total population of children in each GP practice is then calculated as a proportion of the total number of children in all GP practices for each quarter. Following this the cumulative number of proportion of children in GP practices of increasing order of deprivation is calculated (ie the least deprived is added to the next least deprived etc etc until reaching the most deprived practice). The mid-point of the range between each GP practice is then calculated and called the 'weighted_deprivation_rank'. 0 represents the least deprived practice, and 1 represents the most deprived practice.
+```{r}
+# Assuming merged_data is the data frame containing data for all quarters (Q1 to Q16)
+
+# Define a list to store the modified data frames
+df_list <- list()
+
+WeightedDep = function(dat){
+# Loop through quarters Q1 to Q16
+for (quarter_number in 1:16) {
+  # Filter data for the current quarter (Q1, Q2, ..., Q16)
+  dfQ <- dat[dat$Quarter_number == quarter_number, ]
+  
+  # Create a column ranking by IMD score
+  order.scores <- order(dfQ$IMD_2019_score)
+  dfQ$rank <- NA
+  dfQ$rank[order.scores] <- 1:nrow(dfQ)
+  
+  # Calculate the sum of '12m Denom' excluding NA values
+  total_denominator <- sum(dfQ$`12m Denom`, na.rm = TRUE)
+  dfQ <- dfQ %>% mutate(percpop = `12m Denom` / total_denominator) %>%
+    filter(!is.na(percpop))
+  
+  # Ordering by rank, calculate the cumulative proportion of the population in each rank
+  dfQ <- dfQ[order(dfQ$rank),]
+  dfQ <- dfQ %>%  mutate(cumul_pop = cumsum(percpop))
+  
+  
+  # Find the mid-point of the range of values for ranks
+  dfQ <- dfQ %>% mutate(weighted_deprivation_rank = (dplyr::lag(cumul_pop) + (percpop / 2)))
+  
+  # Rank 1 is NA as used lag function, so need to find a value for this
+  dfQ$cumul_pop_halved <- (dfQ$cumul_pop / 2)
+  dfQ$weighted_deprivation_rank[is.na(dfQ$weighted_deprivation_rank)] <- as.character(dfQ$cumul_pop_halved[is.na(dfQ$weighted_deprivation_rank)])
+  dfQ$weighted_deprivation_rank <- as.numeric(dfQ$weighted_deprivation_rank)
+  
+  # Add the modified data frame for the current quarter to the list
+  df_list[[quarter_number]] <- dfQ
+}
+
+  m <- do.call(rbind, df_list)
+  m <- m %>%
+  mutate('Quarter_number' = case_when(
+    Date_quarter == "Apr19Jun19" ~ "00",
+    Date_quarter == "Jul19Sep19" ~ "01",
+    Date_quarter == "Oct19Dec19" ~ "02",
+    Date_quarter == "Jan20Mar20" ~ "03",
+    Date_quarter == "Apr20Jun20" ~ "04",
+    Date_quarter == "Jul20Sep20" ~ "05",
+    Date_quarter == "Oct20Dec20" ~ "06",
+    Date_quarter == "Jan21Mar21" ~ "07",
+    Date_quarter == "Apr21Jun21" ~ "08",
+    Date_quarter == "Jul21Sep21" ~ "09",
+    Date_quarter == "Oct21Dec21" ~ "10",
+    Date_quarter == "Jan22Mar22" ~ "11",
+    Date_quarter == "Apr22Jun22" ~ "12",
+    Date_quarter == "Jul22Sep22" ~ "13",
+    Date_quarter == "Oct22Dec22" ~ "14",
+    Date_quarter == "Jan23Mar23" ~ "15",
+    TRUE ~ Date_quarter
+  ))
+
+class(m$`Quarter_number`)
+m$`Quarter_number` <- as.numeric(m$`Quarter_number`)
+names(m)[1] <- "LA_code"
+return(m)
+}
+
+Y56<-WeightedDep(dat=merged_data[merged_data$`National Grouping`=="Y56",])
+Y58<-WeightedDep(dat=merged_data[merged_data$`National Grouping`=="Y58",])
+Y59<-WeightedDep(dat=merged_data[merged_data$`National Grouping`=="Y59",])
+Y60<-WeightedDep(dat=merged_data[merged_data$`National Grouping`=="Y60",])
+Y61<-WeightedDep(dat=merged_data[merged_data$`National Grouping`=="Y61",])
+Y62<-WeightedDep(dat=merged_data[merged_data$`National Grouping`=="Y62",])
+Y63<-WeightedDep(dat=merged_data[merged_data$`National Grouping`=="Y63",])
+Allregions<-WeightedDep(dat=merged_data)
+#
+
+```
+
+
+
+```{r echo=FALSE, error=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+## Code to produce yearly SII by region and for England
+
+SIIRegion<-function(dat){
+time2019_2020 <- c("0", "1", "2", "3")
+df_2019_2020 <- dat %>%
+  filter(Quarter_number %in% time2019_2020)
+mod1920 <- lmer(`Rotavacc% 12m` ~ weighted_deprivation_rank + (Quarter_number | LA_code), data = df_2019_2020, control = lmerControl(optimizer = "bobyqa"))
+summary(mod1920)
+SII_2019_2020 <- cbind(fixef(mod1920), confint(mod1920, "beta_", method="Wald"))
+row.names(SII_2019_2020)[2] <- "rota_SII_2019_2020"
+SII_2019_2020 <- SII_2019_2020[2, , drop = FALSE]
+
+time2020_2021 <- c("4", "5", "6", "7")
+df_2020_2021 <- dat %>%
+  filter(Quarter_number %in% time2020_2021)
+mod2021 <- lmer(`Rotavacc% 12m` ~ weighted_deprivation_rank + (Quarter_number | LA_code), data = df_2020_2021, control = lmerControl(optimizer = "bobyqa"))
+summary(mod2021)
+SII_2020_2021 <- cbind(fixef(mod2021), confint(mod2021, "beta_", method="Wald"))
+row.names(SII_2020_2021)[2] <- "rota_SII_2020_2021"
+SII_2020_2021 <- SII_2020_2021[2, , drop = FALSE]
+
+time2021_2022 <- c("8", "9", "10", "11")
+df_2021_2022 <- dat %>%
+  filter(Quarter_number %in% time2021_2022)
+mod2122 <- lmer(`Rotavacc% 12m` ~ weighted_deprivation_rank + (Quarter_number | LA_code), data = df_2021_2022, control = lmerControl(optimizer = "bobyqa"))
+summary(mod2122)
+SII_2021_2022 <- cbind(fixef(mod2122), confint(mod2122, "beta_", method="Wald"))
+row.names(SII_2021_2022)[2] <- "rota_SII_2021_2022"
+SII_2021_2022 <- SII_2021_2022[2, , drop = FALSE]
+
+time2022_2023 <- c("12", "13", "14", "15")
+df_2022_2023 <- dat %>%
+  filter(Quarter_number %in% time2022_2023)
+mod2223 <- lmer(`Rotavacc% 12m` ~ weighted_deprivation_rank + (Quarter_number | LA_code), data = df_2022_2023, control = lmerControl(optimizer = "bobyqa"))
+summary(mod2223)
+SII_2022_2023 <- cbind(fixef(mod2223), confint(mod2223, "beta_", method="Wald"))
+row.names(SII_2022_2023)[2] <- "rota_SII_2022_2023"
+SII_2022_2023 <- SII_2022_2023[2, , drop = FALSE]
+
+SII_AS <- as.data.frame(rbind(SII_2019_2020, SII_2020_2021, SII_2021_2022, SII_2022_2023))
+SII_AS<-cbind(c("2019-2020", "2020-2021", "2021-2022", "2022-2023"),data.frame(SII_AS,row.names=NULL))
+SII_AS$Region_code<-dat$`National Grouping`[1]
+SII_AS$Region_name<-dat$`Commissioning Region`[1]
+colnames(SII_AS) <- c("Years","SII","LCI","UCI","Region_Code", "Region_Name")
+
+return(SII_AS)
+}
+
+Y56SII<-SIIRegion(dat=Y56)
+Y58SII<-SIIRegion(dat=Y58)
+Y59SII<-SIIRegion(dat=Y59)
+Y60SII<-SIIRegion(dat=Y60)
+Y61SII<-SIIRegion(dat=Y61)
+Y62SII<-SIIRegion(dat=Y62)
+Y63SII<-SIIRegion(dat=Y63)
+EnglandSII<-SIIRegion(dat=Allregions)
+
+EnglandSII$Region_Code<-"All England"
+EnglandSII$Region_Name<-"All England"
+
+SII_regions<-rbind(Y56SII,Y58SII,Y59SII,Y60SII,Y61SII,Y62SII,Y63SII, EnglandSII)
+
+SII_regions$SII_CIS<-paste0(round(SII_regions$SII,2)," (",round(SII_regions$LCI,2), " to ",round(SII_regions$UCI,2) ,")")
+SII_regions$Vaccine<-"Rotavirus vaccination"
+
+write.csv(SII_regions,paste0(Sys.Date(),"Rotavirus_RegionSII_long.csv"))
+
+```
+
+```{r echo=FALSE, error=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+## Produce a table for the report
+b<- SII_regions[,c(1,5,6,7,8)] %>% group_by(Region_Code,Region_Name, Years) %>% spread(key = Years, value = SII_CIS)
+
+write.csv(b,paste0(Sys.Date(),"Rotavirus_RegionSII.csv",sep=""))
+```
