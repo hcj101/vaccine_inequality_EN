@@ -4,7 +4,7 @@ Pre-print is available here https://www.medrxiv.org/content/10.1101/2024.02.03.2
 
 All the data needed to produce these analyses are available from public sources
 
-The cover of vaccination evaluated rapidly (COVER) programme provides GP level data on paediatric vaccines. We combined and clearen quarterly vaccine data from the below source, the combining of quarterly data process was largely manual and not included in the code:
+The cover of vaccination evaluated rapidly (COVER) programme provides quarterly GP level data on paediatric vaccines. We combined and cleaned quarterly vaccine data from the below source, the combining of quarterly data process was largely manual and not included in the code:
 https://www.gov.uk/government/collections/vaccine-uptake#cover-of-vaccination-evaluated-rapidly-programme
 
 lookup file for Local authorities to regional health geographies
