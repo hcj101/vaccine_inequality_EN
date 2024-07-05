@@ -119,8 +119,9 @@ countGP_sums_after_rota_excludes<-countGP_rota %>% group_by(Quarter_number) %>% 
 exclude_numbers<-cbind(countGP_start,countGP_rm_unknown[,c(2:3)],countGP_rm_dep[,c(2:3)],countGP_sums_after_excludes[,c(2:3)], countGP_sums_after_rota_excludes[,c(2:3)])
 
 write.csv(exclude_numbers,"Patient_flowchart_rota_12m.csv")
-##Remove LAs (Isle of Scilly 906, City of London 714)
+
 ##Additionally for rota remove Surrey 805 and Bradford 209, data derived anomaly
+##can be left out for other vaccines
 
 merged_data <- merged_data %>%
   filter(!`ODS Upper Tier LA Code` %in% c(209, 805))
