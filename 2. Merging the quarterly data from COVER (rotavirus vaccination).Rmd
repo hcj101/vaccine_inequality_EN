@@ -1,0 +1,791 @@
+---
+title: "Merging COVER data quarters together to analyse rotavirus vaccination uptake by GP practice"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Merging quarters BY GP PRACTICE
+
+Install and load packages
+```{r}
+options(repos = "https://cloud.r-project.org")
+library(readxl)
+library(data.table)
+#library("xlsx")
+library("readODS")
+library(dplyr)
+
+```
+
+```{r}
+# Data course with each quarter available at time of analysis saved with nomenclature "[quarter number] coverGP [mon/yr mon/yr].ods" 
+# Example "1 coverGP Apr19Jun19.ods"
+```
+
+```{r Q1 2019/20 (Apr19-Jun19), echo=FALSE} 
+
+data <- read_ods("File path to >>> 1 coverGP Apr19Jun19.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(7012:7014)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["*"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df and add date column
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Apr19Jun19"
+data1_Apr19Jun19 <- as.data.table(data)
+```
+
+
+```{r Q2 2019/20 (Jul19-Sep19), echo=FALSE}
+data <- read_ods("File path to >>> 2 coverGP Jul19Sep19.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6973:6976)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["*"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Jul19Sep19"
+data2_Jul19Sep19 <- as.data.table(data)
+```
+
+```{r Q3 2019/20 (Oct19-Dec19), echo=FALSE}
+data <- read_ods("File path to >>> 3 coverGP Oct19Dec19.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6915:6917)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["*"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Oct19Dec19"
+data3_Oct19Dec19 <- as.data.table(data)
+```
+
+```{r Q4 2019/20 (Jan20-Mar20), echo=FALSE}
+data <- read_ods("File path to >>> 4 coverGP Jan20Mar20.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6905:6907)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["*"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Jan20Mar20"
+data4_Jan20Mar20 <- as.data.table(data)
+```
+
+```{r Q1 2020/21 (Apr20-Jun20), echo=FALSE}
+data <- read_ods("File path to >>> 5 coverGP Apr20Jun20.ods" , sheet = 2 , skip = 5)
+rows_to_remove <- c(6768,6769)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,10)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["*"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Apr20Jun20"
+data5_Apr20Jun20 <- as.data.table(data)
+```
+
+```{r Q2 2020/21 (Jul20-Sep20), echo=FALSE}
+data <- read_ods("File path to >>> 6 coverGP Jul20Sep20.ods" , sheet = 2 , skip = 5)
+rows_to_remove <- c(6737)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,10)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["*"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Jul20Sep20"
+data6_Jul20Sep20 <- as.data.table(data)
+```
+
+```{r Q3 2020/21 (Oct20-Dec20), echo=FALSE}
+data <- read_ods("File path to >>> 7 coverGP Oct20Dec20.ods" , sheet = 2 , skip = 3)
+rows_to_remove <- c(6719, 6720)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,10)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["*"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Oct20Dec20"
+data7_Oct20Dec20 <- as.data.table(data)
+```
+
+```{r Q4 2020/21 (Jan21-Mar21), echo=FALSE}
+
+data <- read_ods("File path to >>> 8 coverGP Jan21Mar21.ods" , sheet = 2 , skip = 3)
+rows_to_remove <- c(6691, 6692)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["*"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Jan21Mar21"
+data8_Jan21Mar21 <- as.data.table(data)
+```
+
+```{r Q1 2021/22 (Apr21-Jun21), echo=FALSE}
+
+data <- read_ods("File path to >>> 9 coverGP Apr21Jun21.ods" , sheet = 2 , skip = 3)
+rows_to_remove <- c(6605, 6606)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["*"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Apr21Jun21"
+data9_Apr21Jun21 <- as.data.table(data)
+```
+
+Note denom with lower case d in this Q
+```{r Q2 2021/22 (Jul21-Sep21), echo=FALSE}
+
+data <- read_ods("File path to >>> 10 coverGP Jul21Sep21.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6509)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m denominator`)["[note1]"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m denominator` <- as.numeric(data$`12m denominator`)
+total_denom <- sum(data$`12m denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Jul21Sep21"
+data10_Jul21Sep21 <- as.data.table(data)
+```
+
+```{r Q3 2021/22 (Oct21-Dec21), echo=FALSE}
+
+data <- read_ods("File path to >>> 11 coverGP Oct21Dec21.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6513)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["[note1]"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Oct21Dec21"
+data11_Oct21Dec21 <- as.data.table(data)
+```
+
+```{r Q4 2021/22 (Jan22-Mar22), echo=FALSE}
+
+data <- read_ods("File path to >>> 12 coverGP Jan22Mar22.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6482)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["[note1]"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Jan22Mar22"
+data12_Jan22Mar22 <- as.data.table(data)
+```
+
+```{r Q1 2022/23 (Apr22-Jun22), echo=FALSE}
+
+data <- read_ods("File path to >>> 13 coverGP Apr22Jun22.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6477)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["[note1]"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Apr22Jun22"
+data13_Apr22Jun22 <- as.data.table(data)
+```
+
+CCGs change to ICB here
+```{r Q2 2022/23 (Jul22-Sep22), echo=FALSE}
+
+data <- read_ods("File path to >>> 14 coverGP Jul22Sep22.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6448)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(2,3,4,8)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["[note1]"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Jul22Sep22"
+data14_Jul22Sep22 <- as.data.table(data)
+```
+
+```{r Q3 2022/23 (Oct22-Dec22), echo=FALSE}
+
+data <- read_ods("File path to >>> 15 coverGP Oct22Dec22.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6429)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12m Rota%`)
+data$`12m Rota%` <- as.numeric(data$`12m Rota%`)
+
+class(data$`12m Denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12m Denominator`)["[note 1]"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12m Denominator` <- as.numeric(data$`12m Denominator`)
+total_denom <- sum(data$`12m Denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12m Denominator` * (100 - data$`12m Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Oct22Dec22"
+data15_Oct22Dec22 <- as.data.table(data)
+```
+
+```{r Q4 2022/23 (Jan23-Mar23), echo=FALSE}
+
+data <- read_ods("File path to >>> 16 coverGP Jan23Mar23.ods" , sheet = 2 , skip = 2)
+rows_to_remove <- c(6398)
+data <- data[-rows_to_remove, ]
+#Keep only rota column and GP codes (omit CCG info and other vaccs here)
+data <- data[,c(3,4,5,9)]
+#Rename CCG and practice columns to match others
+names(data)[1] <- "ODS Upper Tier LA Code"
+names(data)[2] <- "Practice code"
+
+#Check classes, switch ODS and Practice codes to characters
+class(data$`ODS Upper Tier LA Code`)
+data$`ODS Upper Tier LA Code`<- as.character(data$`ODS Upper Tier LA Code`)
+class(data$`Practice code`)
+data$`Practice code` <- as.character(data$`Practice code`)
+class(data$`12 month Rota%`)
+data$`12 month Rota%` <- as.numeric(data$`12 month Rota%`)
+
+class(data$`12 month denominator`)
+
+#Find out how many unknown codes
+count_V81999_unknown_GPcodes <- table(data$`Practice code`)["V81999"]
+print(count_V81999_unknown_GPcodes)
+#Remove unknown codes
+data <- data[!data$`Practice code` == "V81999", ]
+
+#Find out denoms less than 5 people and work out maximum that would be lost
+count_less_than_5_denoms <- table(data$`12 month denominator`)["[note1]"]
+print(count_less_than_5_denoms)
+maximum_children_lost_low_denoms <- count_less_than_5_denoms*5
+print(maximum_children_lost_low_denoms)
+data$`12 month denominator` <- as.numeric(data$`12 month denominator`)
+total_denom <- sum(data$`12 month denominator`, na.rm=TRUE)
+maximum_lost_percentage <- ((maximum_children_lost_low_denoms / total_denom) * 100)
+print(maximum_lost_percentage)
+
+#Make new 'susceptibles' column
+data$rota_susceptibles <- data$`12 month denominator` * (100 - data$`12 month Rota%`) / 100
+
+#Rename to columns to dated quarters and to dated df
+names(data)[3] <- "12m Denom"
+names(data)[4] <- "Rotavacc% 12m"
+names(data)[5] <- "Rota susceptibles"
+data$Date_quarter <- "Jan23Mar23"
+data16_Jan23Mar23 <- as.data.table(data)
+
+```
+
+Merge all of the 16 quarters into one dataframe and save as dataset for analysis
+```{r}
+
+combined_data <- do.call(rbind, list(data1_Apr19Jun19, data2_Jul19Sep19, data3_Oct19Dec19, data4_Jan20Mar20, data5_Apr20Jun20, data6_Jul20Sep20, data7_Oct20Dec20, data8_Jan21Mar21, data9_Apr21Jun21, data10_Jul21Sep21, data11_Oct21Dec21, data12_Jan22Mar22, data13_Apr22Jun22, data14_Jul22Sep22, data15_Oct22Dec22, data16_Jan23Mar23))
+
+#write.csv(combined_data, "GP rota merge length ways.csv")
+
+```
+

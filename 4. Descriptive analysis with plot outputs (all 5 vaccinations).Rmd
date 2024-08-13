@@ -1,0 +1,269 @@
+---
+title: "Descriptive analyses and SII plots - childhood vaccination uptake inequalities (all 5 vaccinations)"
+author: "Aidan Flatt, Dan Hungerford, David Taylor-Robinson"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+### Load libraries
+
+library(data.table) # For data wrangling and aggregation 
+library(ggplot2) # For plotting datalibrary(leaflet) # For mapping
+library(readODS)
+library(stringr)
+library(gridExtra) #for arranging ggplot objects
+library(grid)      #for grid.rect: Draw rectangles
+library(dplyr)
+library(tidyverse)
+library(colourvalues) 
+library(viridis)
+```
+
+#Read in the GP uptake data across the time period and the deprivation data
+#Sub out 'File path >>>' with path the csv files for individual users
+```{r}
+##Set working directory
+setwd("File path to folder")
+
+## List of data files in directory
+temp<-list.files()
+temp<-temp[grep("merge length ways", temp)]
+
+#names of columns
+names<-c("Num","LA.Code","Practice_code","Denom","Uptake","Susceptibles","Date_quarter","Vaccine")
+col_type<-c("numeric","character","character","numeric","numeric","numeric","character","character")
+
+# read data for each vaccine
+GP6in1 <- read_csv("File path >>> GP 6in1 merge length ways.csv", col_names = names, skip = 1)
+GPMMR1y2 <- read_csv("File path >>> GP MMR1 merge length ways.csv",col_names = names, skip = 1)
+GPMMR1y5 <- read_csv("File path >>> GP MMR1y5 merge length ways.csv",col_names = names, skip = 1)
+GPMMR2y5 <- read_csv("File path >>> GP MMR2 merge length ways.csv",col_names = names, skip = 1)
+PCVboost <- read_csv("File path >>> GP PCVboost merge length ways.csv",col_names = names, skip = 1)
+Rota <- read_csv("File path >>> GP rota merge length ways.csv",col_names = names, skip = 1)
+
+# Add field identifying vaccine type for merging later
+GP6in1$Vaccine<-"6in1 vaccination"
+GPMMR1y2$Vaccine<-"MMR1y2 vaccination"
+GPMMR1y5$Vaccine<-"MMR1y5 vaccination"
+GPMMR2y5$Vaccine<-"MMR2 vaccination"
+PCVboost$Vaccine<-"PCV booster vaccination"
+Rota$Vaccine<-"Rotavirus vaccination"
+
+## Remove additional local authority code outliers for rota
+Rota<-Rota %>% filter(!LA.Code %in% c(209, 805))
+
+data<-bind_rows(GP6in1,GPMMR1y2,GPMMR1y5,GPMMR2y5,PCVboost,Rota)
+
+# Read in the Deprivation data
+deprivation_data <- read_csv("File path >>> GP codes with deprivation.csv")
+names(deprivation_data)[2] <- "Practice_code"
+names(deprivation_data)[3] <- "Practice_name"
+names(deprivation_data)[5] <- "IMD_2019_score"
+names(deprivation_data)[6] <- "IMD_decile"
+deprivation_data <- deprivation_data[,c(2,3,5,6)]
+
+## Merge deprivation data with uptake data
+merged_data <- merge(data, deprivation_data, by = "Practice_code", all.x = TRUE)
+
+## create new quarter variable which is numeric from 1-16
+merged_data <- merged_data %>%
+  mutate('Quarter_number' = case_when(
+    Date_quarter == "Apr19Jun19" ~ "01",
+    Date_quarter == "Jul19Sep19" ~ "02",
+    Date_quarter == "Oct19Dec19" ~ "03",
+    Date_quarter == "Jan20Mar20" ~ "04",
+    Date_quarter == "Apr20Jun20" ~ "05",
+    Date_quarter == "Jul20Sep20" ~ "06",
+    Date_quarter == "Oct20Dec20" ~ "07",
+    Date_quarter == "Jan21Mar21" ~ "08",
+    Date_quarter == "Apr21Jun21" ~ "09",
+    Date_quarter == "Jul21Sep21" ~ "10",
+    Date_quarter == "Oct21Dec21" ~ "11",
+    Date_quarter == "Jan22Mar22" ~ "12",
+    Date_quarter == "Apr22Jun22" ~ "13",
+    Date_quarter == "Jul22Sep22" ~ "14",
+    Date_quarter == "Oct22Dec22" ~ "15",
+    Date_quarter == "Jan23Mar23" ~ "16",
+    TRUE ~ Date_quarter
+  ))
+
+class(merged_data$`Quarter_number`)
+merged_data$`Quarter_number` <- as.numeric(merged_data$`Quarter_number`)
+
+## Create vaccine numerator
+merged_data$Vacc_numerator <- merged_data$Denom * (merged_data$Uptake/100)
+
+##Remove LAs (Isle of Scilly 906, City of London 714)
+
+merged_data <- merged_data %>%
+  filter(!LA.Code %in% c(906, 714))
+
+##remove Unknown practice codes
+
+merged_data <- merged_data %>%
+  filter(!Practice_code %in% c("V81999", "0", "v81999"))
+
+##No IMD score
+merged_data <- merged_data %>%
+  filter(!IMD_decile %in% c(NA))
+
+## Group uptake by vaccine, decile and quarter
+plot01<- subset(merged_data, Practice_code!="0") %>% group_by(Quarter_number, Date_quarter, Vaccine,IMD_decile) %>% summarise(uptake = (sum(Vacc_numerator, na.rm = TRUE) / sum(Denom, na.rm = TRUE)) * 100, Denom = sum(Denom, na.rm = TRUE),NumGP=n_distinct(Practice_code, na.rm=TRUE))
+
+plot01 <- plot01 %>%
+  filter(!is.na(IMD_decile))
+
+## CIs for proportions
+plot01$SE<-sqrt(((plot01$uptake/100)*(1-(plot01$uptake/100)))/plot01$Denom)
+plot01$LCI<- ((plot01$uptake/100) -  1.96*(plot01$SE))*100
+plot01$UCI<- ((plot01$uptake/100) +  1.96*(plot01$SE))*100
+
+##Summary overall for each vaccine and quarter 
+sumUptake<- subset(merged_data, Practice_code!="0") %>% group_by(Quarter_number, Date_quarter, Vaccine) %>% summarise(uptake = (sum(Vacc_numerator, na.rm = TRUE) / sum(Denom, na.rm = TRUE)) * 100, Denom = sum(Denom, na.rm = TRUE), NumGP=n_distinct(Practice_code, na.rm=TRUE) )
+
+write.csv(sumUptake, "Uptake_Summary_by Quarter.csv")
+
+  write.csv(plot01, "Uptake_Summary_by_IMD_Quarter.csv")
+
+```
+
+#Plot mean vaccine uptake % by deprivation score over time period for all vaccinations
+```{r}
+
+## Plot vaccination uptake by IMD and quarter Assuming plot01 is your data
+library(ggplot2)
+library(grid)
+library(gridExtra)
+facet_names <- list(
+  '6in1 vaccination'="6in1 vaccination",
+  'Rotavirus vaccination'="Rotavirus vaccination",
+  'PCV booster vaccination'="PCV booster vaccination",
+  'MMR1y2 vaccination'="MMR1 vaccination by two years",
+  'MMR1y5 vaccination'="MMR1 vaccination by 5 years years",
+  'MMR2 vaccination'="MMR2 vaccination by five years"
+)
+
+facet_labeller <- function(variable,value){
+  return(facet_names[value])
+}
+ggplot(data = plot01, aes(x = Quarter_number, y = uptake, group = as.factor(IMD_decile), color = as.factor(IMD_decile))) + facet_wrap(~as.factor(Vaccine), labeller=facet_labeller)+
+  geom_rect(aes(xmin = 5, xmax = 13, ymin = -Inf, ymax = 97), fill = "#F5F5F5", alpha = 0.2, color = "NA") + 
+#  geom_ribbon(aes(ymin=plot01$LCI, ymax=plot01$UCI, group = as.factor(IMD_decile), fill = as.factor(IMD_decile)), alpha=0.5, col = NA)+
+  geom_line(size = 1.2) +
+  geom_segment(aes(x = 0, y = 95, xend = 16, yend = 95), linetype = "dashed", color = "grey", size = 1.5) +
+ # annotate("text", x = 14.5, y = 95, label = "WHO uptake target", color = "grey", size = 6,
+        #   vjust = -0.5, hjust = 0, fontface = "bold") +
+  scale_color_manual(values = mako(length(unique(plot01$IMD_decile))), name = "IMD decile",
+                     labels = c("1 Least deprived", "2", "3", "4", "5", "6", "7", "8", "9", "10 Most deprived")) +
+  #scale_fill_manual(values = mako(length(unique(plot01$IMD_decile))), name = "IMD decile",labels = c("1 Least deprived", "2", "3", "4", "5", "6", "7", "8", "9", "10 Most deprived"))+
+  labs(x = "Time period (Quarter)", y = "Mean vaccine uptake (%)") +
+  theme_classic() +
+  theme(axis.text.y = element_text(size = 12),axis.text.x = element_text(size = 12, angle = 90, hjust = 1, vjust = 0.5),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.text = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12, face = "bold"),
+        legend.position="bottom", legend.box = "horizontal",
+        plot.margin = margin(margin(10, 10, 10, 10)),
+        axis.title.y = element_text(vjust = +3),
+        axis.title.x = element_text(vjust = -0.75)) +
+  scale_y_continuous(limits = c(75, 100), expand = c(0, 0), labels = scales::percent_format(scale = 1)) +
+  scale_x_discrete(limits = c("Apr19Jun19", "Jul19Sep19", "Oct19Dec19", "Jan20Mar20", "Apr20Jun20", "Jul20Sep20", "Oct20Dec20", "Jan21Mar21", "Apr21Jun21", "Jul21Sep21","Oct21Dec21", "Jan22Mar22", "Apr22Jun22", "Jul22Sep22", "Oct22Dec22", "Jan23Mar23"))
+
+ggsave(paste(Sys.Date(),"Uptake_mean_Lineplot.jpeg",sep="_"),width=12, height=10,dpi=450)
+```
+
+#Plot the SII values for each annual period with error bars
+```{r}
+
+SIIplot <- read_csv("File path >>> SIIbyyear_for_plot.csv")
+SIIplot$Vaccine<-as.factor(SIIplot$Vaccine)
+SIIplot$Vaccine<-factor(SIIplot$Vaccine, levels=c('6in1 vaccination','Rotavirus vaccination','PCV booster vaccination','MMR1 vaccination by two years','MMR1 vaccination by five years','MMR2 vaccination by five years'))
+## make a new color palette excluding dark colours
+mako_pal <- viridis::mako(n = 8)[c(-1,-2)]
+
+##Plot SII
+ggplot(data = SIIplot) +geom_bar(aes(x = Year, y = SII, group = as.factor(Vaccine), fill = as.factor(Vaccine)),stat="identity")+ facet_wrap(~Vaccine)+
+  geom_text(aes(x = Year, y = SII_UCI-0.4, label = SII), color = "black", size = 4, fontface = "bold") +
+  geom_errorbar(aes(x = Year, y = SII,ymin=SII_LCI, ymax=SII_UCI), width=.2,position=position_dodge(.9)) +
+  scale_fill_manual(values = mako_pal, name ="") + guides(fill = FALSE)+
+  xlab("Year")+ylab("Slope Index of Inequality: % drop in vaccine uptake") +
+  theme_classic() +
+  theme(axis.text = element_text(size = 12, face = "bold"),axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),strip.text = element_text(size = 14),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.text = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12, face = "bold"),
+        plot.margin = margin(margin(10, 10, 10, 10)),
+        axis.title.y = element_text(vjust = +3),
+        axis.title.x = element_text(vjust = -0.75))
+
+##save SII
+ggsave(paste(Sys.Date(),"SIIplot.jpeg",sep="_"),width=12, height=10,dpi=450)
+
+```
+
+## Create a plot for the cumulative susceptibility to Rotavirus and MMR diseases over study period
+```{r}
+
+##isolate and merge MMR 1 and MMR2 data
+susMMR<-merge(merged_data[merged_data$Vaccine=="MMR1y5 vaccination",],merged_data[merged_data$Vaccine=="MMR2 vaccination",], by = c("Practice_code","Date_quarter"), all = TRUE)
+susMMR$NoMMR<-susMMR$Susceptibles.x
+susMMR$MMR2<-susMMR$Vacc_numerator.y
+susMMR$MMR1<-susMMR$Vacc_numerator.x-susMMR$Vacc_numerator.y
+
+# Create number of susceptibles by quarter and IMD decile using VE estimates from CDC and method from Keenan et al., doi: 10.1136/bmjopen-2016-014106
+cumulative_MMR2 <- aggregate(((NoMMR)+(MMR2*0.03)+(MMR1*0.07)) ~ Quarter_number.x + IMD_decile.x, data = susMMR, sum)
+names(cumulative_MMR2)[3] <- "susceptibles"
+
+#Create cumulative number of susceptibles over time by quarter and IMD decile
+cumulative_MMR2 <- cumulative_MMR2 %>%
+  group_by(IMD_decile.x) %>%
+  mutate(Cumulative_susceptibles = cumsum(susceptibles)) %>%
+  ungroup()
+
+
+#isolate just rota data
+susRota<-merged_data[merged_data$Vaccine=="Rotavirus vaccination",]
+
+# Create number of susceptibles by quarter and IMD decile using VE estimates from Hungerford et al.,  DOI: 10.1186/s12879-017-2613-4 
+cumulative_Rota <- aggregate(((Susceptibles-(Denom*0.05)) + (Denom * 0.05 * 0.28) + (Vacc_numerator * 0.13)) ~ Quarter_number + IMD_decile, data = susRota, sum)
+names(cumulative_Rota)[3] <- "susceptibles"
+
+#Create cumulative number of susceptibles over time by quarter and IMD decile
+cumulative_Rota <- cumulative_Rota %>%
+  group_by(IMD_decile) %>%
+  mutate(Cumulative_susceptibles = cumsum(susceptibles)) %>%
+  ungroup()
+
+## Combine into 1 dataframe MMR and rota susceptibles for plotting
+colnames(cumulative_MMR2)<-c("Quarter_number","IMD_decile","susceptibles", "Cumulative_susceptibles")
+cumulative_MMR2$Vaccine<-"MMR"
+cumulative_Rota$Vaccine<-"Rota"
+
+plot06<-bind_rows(cumulative_Rota,cumulative_MMR2)
+
+## Plot susceptibles
+ggplot(data = plot06, aes(x = Quarter_number, y = Cumulative_susceptibles, group = as.factor(IMD_decile), color = as.factor(IMD_decile))) + 
+  facet_wrap(~Vaccine, ncol = 2, labeller = as_labeller(c(Rota = "Susceptible to rotavirus disease at one year", MMR = "Susceptible to measles at five years") ))+
+  geom_line(size = 1.2) +
+  scale_color_manual(values = mako(length(unique(plot06$IMD_decile))), name = "IMD decile",
+                     labels = c("1 Least deprived", "2", "3", "4", "5", "6", "7", "8", "9", "10 Most deprived")) +
+  xlab("Time period (Quarter)") + ylab("Cumulative number")+
+  theme_classic() +
+  theme(axis.text.y = element_text(size = 12),axis.text.x = element_text(size = 12, angle = 90, hjust = 1, vjust = 0.5),strip.text = element_text(size = 14),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.text = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12, face = "bold"),
+        legend.position="bottom", legend.box = "horizontal",
+        plot.margin = margin(margin(10, 10, 10, 10)),
+        axis.title.y = element_text(vjust = +3),
+        axis.title.x = element_text(vjust = -0.75)) +
+  scale_y_continuous(breaks = seq(0, 50000, by = 10000)) +
+  scale_x_discrete(limits = c("Apr19Jun19", "Jul19Sep19", "Oct19Dec19", "Jan20Mar20", "Apr20Jun20", "Jul20Sep20", "Oct20Dec20", "Jan21Mar21", "Apr21Jun21", "Jul21Sep21","Oct21Dec21", "Jan22Mar22", "Apr22Jun22", "Jul22Sep22", "Oct22Dec22", "Jan23Mar23"))
+
+# save susceptibles plot
+ggsave(paste(Sys.Date(),"Cumulative_susceptible.jpeg",sep="_"),width=10, height=6,dpi=450)
+
+
+```
+
