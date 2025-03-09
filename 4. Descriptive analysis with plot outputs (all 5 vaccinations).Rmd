@@ -26,35 +26,11 @@ library(viridis)
 ##Set working directory
 #setwd("File path to folder")
 
-## List of data files in directory
-temp<-list.files()
-temp<-temp[grep("merge length ways", temp)]
+# read data 
+GP_MMR <- read_csv("GP MMR merge length ways.csv")
+data<-GP_MMR
 
-#names of columns
-names<-c("Num","LA.Code","Practice_code","Denom","Uptake","Susceptibles","Quarter_number","Vaccine")
-col_type<-c("numeric","character","character","numeric","numeric","numeric","numeric","character")
-
-# read data for each vaccine
-# GP6in1 <- read_csv("File path >>> GP 6in1 merge length ways.csv", col_names = names, skip = 1)
-GPMMR1y2 <- read_csv("GP MMR1 merge length ways.csv",col_names = names, skip = 1)
-# GPMMR1y5 <- read_csv("File path >>> GP MMR1y5 merge length ways.csv",col_names = names, skip = 1)
-# GPMMR2y5 <- read_csv("File path >>> GP MMR2 merge length ways.csv",col_names = names, skip = 1)
-# PCVboost <- read_csv("File path >>> GP PCVboost merge length ways.csv",col_names = names, skip = 1)
-# Rota <- read_csv("GP rota merge length ways.csv",col_names = names, skip = 1)
-
-# Add field identifying vaccine type for merging later
-# GP6in1$Vaccine<-"6in1 vaccination"
-GPMMR1y2$Vaccine<-"MMR1y2 vaccination"
-# GPMMR1y5$Vaccine<-"MMR1y5 vaccination"
-# GPMMR2y5$Vaccine<-"MMR2 vaccination"
-# PCVboost$Vaccine<-"PCV booster vaccination"
-# Rota$Vaccine<-"Rotavirus vaccination"
-
-## Remove additional local authority code outliers for rota
-#Rota<-Rota %>% filter(!LA.Code %in% c(209, 805))
-
-#data<-bind_rows(GP6in1,GPMMR1y2,GPMMR1y5,GPMMR2y5,PCVboost,Rota)
-data<-GPMMR1y2
+# Finished!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # Read in the Deprivation data
 deprivation_data <- read_csv("GP codes with deprivation.csv")
@@ -67,71 +43,102 @@ deprivation_data <- deprivation_data[,c(2,3,5,6)]
 ## Merge deprivation data with uptake data
 merged_data <- merge(data, deprivation_data, by = "Practice_code", all.x = TRUE)
 
-# ## create new quarter variable which is numeric from 1-16
-# merged_data <- merged_data %>%
-#   mutate('Quarter_number' = case_when(
-#     Date_quarter == "Apr19Jun19" ~ "01",
-#     Date_quarter == "Jul19Sep19" ~ "02",
-#     Date_quarter == "Oct19Dec19" ~ "03",
-#     Date_quarter == "Jan20Mar20" ~ "04",
-#     Date_quarter == "Apr20Jun20" ~ "05",
-#     Date_quarter == "Jul20Sep20" ~ "06",
-#     Date_quarter == "Oct20Dec20" ~ "07",
-#     Date_quarter == "Jan21Mar21" ~ "08",
-#     Date_quarter == "Apr21Jun21" ~ "09",
-#     Date_quarter == "Jul21Sep21" ~ "10",
-#     Date_quarter == "Oct21Dec21" ~ "11",
-#     Date_quarter == "Jan22Mar22" ~ "12",
-#     Date_quarter == "Apr22Jun22" ~ "13",
-#     Date_quarter == "Jul22Sep22" ~ "14",
-#     Date_quarter == "Oct22Dec22" ~ "15",
-#     Date_quarter == "Jan23Mar23" ~ "16",
-#     TRUE ~ Date_quarter
-#   ))
-# 
-# class(merged_data$`Quarter_number`)
-# merged_data$`Quarter_number` <- as.numeric(merged_data$`Quarter_number`)
+# Add local data
+data_geo = read.csv("https://raw.githubusercontent.com/drkane/geo-lookups/refs/heads/master/utla_all_codes.csv") %>%
+  rename(Region = RGNNM)
+
+#
+data_mmr1_2y = merged_data %>%
+  dplyr::select(Practice_code, `ODS Upper Tier LA Code`, `24m Denom`, `MMR1% 24m`, Quarter_number,IMD_decile) %>%
+  rename(Denom = `24m Denom`,
+         Uptake = `MMR1% 24m`,
+         LA.Code = `ODS Upper Tier LA Code`) %>%
+  mutate(Vaccine = "MMR1 2y",
+         Denom = as.character(Denom))
+
+data_mmr1_5y = merged_data %>%
+  dplyr::select(Practice_code, `ODS Upper Tier LA Code`, `5y Denom`, `MMR1% 5y`, Quarter_number,IMD_decile) %>%
+  rename(Denom = `5y Denom`,
+         Uptake = `MMR1% 5y`,
+         LA.Code = `ODS Upper Tier LA Code`) %>%
+  mutate(Vaccine = "MMR1 5y",
+         Denom = as.character(Denom))
+
+data_mmr2_5y = merged_data %>%
+  dplyr::select(Practice_code, `ODS Upper Tier LA Code`, `5y Denom`, `MMR2% 5y`, Quarter_number,IMD_decile) %>%
+  rename(Denom = `5y Denom`,
+         Uptake = `MMR2% 5y`,
+         LA.Code = `ODS Upper Tier LA Code`) %>%
+  mutate(Vaccine = "MMR2 5y",
+         Denom = as.character(Denom))
+
+data_all = bind_rows(data_mmr1_2y, data_mmr1_5y, data_mmr2_5y)
+
+##No IMD score
+data_all <- data_all %>%
+  filter(!IMD_decile %in% c(NA))
+
+# Change char to double
+data_all$Denom = as.double(data_all$Denom)
 
 ## Create vaccine numerator
-merged_data$Vacc_numerator <- merged_data$Denom * (merged_data$Uptake/100)
+data_all$Vacc_numerator <- data_all$Denom * (data_all$Uptake/100)
 
 ##Remove LAs (Isle of Scilly 906, City of London 714)
-
-merged_data <- merged_data %>%
+data_all <- data_all %>%
   filter(!LA.Code %in% c(906, 714))
 
 ##remove Unknown practice codes
 
-merged_data <- merged_data %>%
+data_all <- data_all %>%
   filter(!Practice_code %in% c("V81999", "0", "v81999"))
 
-##No IMD score
-merged_data <- merged_data %>%
-  filter(!IMD_decile %in% c(NA))
+# Split the 10 groups into 2
+data_all = data_all %>%
+  mutate(IMD_half = ifelse(IMD_decile >5, 2, 1))
+
 
 ## Group uptake by vaccine, decile and quarter
-plot01<- subset(merged_data, Practice_code!="0") %>% 
-  group_by(Quarter_number, Vaccine,IMD_decile) %>% 
+plot01<- subset(data_all, Practice_code!="0") %>% 
+  group_by(Quarter_number, Vaccine, IMD_decile) %>% 
   summarise(uptake = (sum(Vacc_numerator, na.rm = TRUE) / sum(Denom, na.rm = TRUE)) * 100, 
-            Denom = sum(Denom, na.rm = TRUE),NumGP=n_distinct(Practice_code, na.rm=TRUE)
+            Denom = sum(Denom, na.rm = TRUE),
+            NumGP=n_distinct(Practice_code, na.rm=TRUE)
+            )
+
+plot02 <- subset(data_all, Practice_code!="0") %>% 
+  group_by(Quarter_number, Vaccine, IMD_half) %>% 
+  summarise(uptake = (sum(Vacc_numerator, na.rm = TRUE) / sum(Denom, na.rm = TRUE)) * 100, 
+            Denom = sum(Denom, na.rm = TRUE),
+            NumGP=n_distinct(Practice_code, na.rm=TRUE)
             )
 
 plot01 <- plot01 %>%
   filter(!is.na(IMD_decile))
+
+plot02 <- plot02 %>%
+  filter(!is.na(IMD_half))
 
 ## CIs for proportions
 plot01$SE<-sqrt(((plot01$uptake/100)*(1-(plot01$uptake/100)))/plot01$Denom)
 plot01$LCI<- ((plot01$uptake/100) -  1.96*(plot01$SE))*100
 plot01$UCI<- ((plot01$uptake/100) +  1.96*(plot01$SE))*100
 
+plot02$SE<-sqrt(((plot02$uptake/100)*(1-(plot02$uptake/100)))/plot02$Denom)
+plot02$LCI<- ((plot02$uptake/100) -  1.96*(plot02$SE))*100
+plot02$UCI<- ((plot02$uptake/100) +  1.96*(plot02$SE))*100
+
 ##Summary overall for each vaccine and quarter 
-sumUptake<- subset(merged_data, Practice_code!="0") %>% 
+sumUptake<- subset(data_all, Practice_code!="0") %>% 
   group_by(Quarter_number, Vaccine) %>% 
-  summarise(uptake = (sum(Vacc_numerator, na.rm = TRUE) / sum(Denom, na.rm = TRUE)) * 100, Denom = sum(Denom, na.rm = TRUE), NumGP=n_distinct(Practice_code, na.rm=TRUE) )
+  summarise(uptake = (sum(Vacc_numerator, na.rm = TRUE) / sum(Denom, na.rm = TRUE)) * 100, 
+            Denom = sum(Denom, na.rm = TRUE), 
+            NumGP=n_distinct(Practice_code, na.rm=TRUE) )
 
 write.csv(sumUptake, "Uptake_Summary_by Quarter.csv")
 
 write.csv(plot01, "Uptake_Summary_by_IMD_Quarter.csv")
+write.csv(plot02, "Uptake_Summary_by_IMD_half.csv")
 
 ```
 
@@ -143,12 +150,9 @@ library(ggplot2)
 library(grid)
 library(gridExtra)
 facet_names <- list(
-  '6in1 vaccination'="6in1 vaccination",
-  'Rotavirus vaccination'="Rotavirus vaccination",
-  'PCV booster vaccination'="PCV booster vaccination",
-  'MMR1y2 vaccination'="MMR1 vaccination by two years",
-  'MMR1y5 vaccination'="MMR1 vaccination by 5 years years",
-  'MMR2 vaccination'="MMR2 vaccination by five years"
+  'MMR1 y2'="MMR1 vaccination by two years",
+  'MMR1 y5'="MMR1 vaccination by 5 years years",
+  'MMR2 5y'="MMR2 vaccination by five years"
 )
 
 facet_labeller <- function(variable,value){
@@ -176,11 +180,43 @@ ggplot(data = plot01, aes(x = Quarter_number, y = uptake, group = as.factor(IMD_
         axis.title.x = element_text(vjust = -0.75)) +
   scale_y_continuous(limits = c(75, 100), expand = c(0, 0), labels = scales::percent_format(scale = 1)) +
   scale_x_discrete(limits = c("Apr19Jun19", "Jul19Sep19", "Oct19Dec19", "Jan20Mar20", "Apr20Jun20", "Jul20Sep20", "Oct20Dec20", "Jan21Mar21", "Apr21Jun21", "Jul21Sep21","Oct21Dec21", "Jan22Mar22", "Apr22Jun22", "Jul22Sep22", "Oct22Dec22", "Jan23Mar23",
-                              "Apr23Jun23", "Jul23Sep23", "Oct23Dec23", "Jan24Mar24"
+                              "Apr23Jun23", "Jul23Sep23", "Oct23Dec23", "Jan24Mar24",
                               "Apr24Jun24", "Jul24Sep24", "Oct24Dec24"
                               ))
 
-ggsave(paste(Sys.Date(),"Uptake_mean_Lineplot.jpeg",sep="_"),width=12, height=10,dpi=450)
+ggsave(paste(Sys.Date(),"Uptake_mean_Lineplot_10groups.jpeg",sep="_"),width=12, height=10,dpi=450)
+
+
+
+ggplot(data = plot02, aes(x = Quarter_number, y = uptake, group = as.factor(IMD_half), color = as.factor(IMD_half))) + facet_wrap(~as.factor(Vaccine))+
+  geom_rect(aes(xmin = 5, xmax = 13, ymin = -Inf, ymax = 97), fill = "#F5F5F5", alpha = 0.2, color = "NA") + 
+#  geom_ribbon(aes(ymin=plot01$LCI, ymax=plot01$UCI, group = as.factor(IMD_decile), fill = as.factor(IMD_decile)), alpha=0.5, col = NA)+
+  geom_line(size = 1.2) +
+  geom_segment(aes(x = 0, y = 95, xend = 16, yend = 95), linetype = "dashed", color = "grey", size = 1.5) +
+ # annotate("text", x = 14.5, y = 95, label = "WHO uptake target", color = "grey", size = 6,
+        #   vjust = -0.5, hjust = 0, fontface = "bold") +
+  scale_color_manual(values = c("black","red"), name = "IMD half",
+                     labels = c("1 Least deprived", "2 Most deprived")) +
+  #scale_fill_manual(values = mako(length(unique(plot01$IMD_decile))), name = "IMD decile",labels = c("1 Least deprived", "2", "3", "4", "5", "6", "7", "8", "9", "10 Most deprived"))+
+  labs(x = "Time period (Quarter)", y = "Mean vaccine uptake (%)") +
+  theme_classic() +
+  theme(axis.text.y = element_text(size = 12),axis.text.x = element_text(size = 12, angle = 90, hjust = 1, vjust = 0.5),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.text = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12, face = "bold"),
+        legend.position="bottom", legend.box = "horizontal",
+        plot.margin = margin(margin(10, 10, 10, 10)),
+        axis.title.y = element_text(vjust = +3),
+        axis.title.x = element_text(vjust = -0.75)) +
+  scale_y_continuous(limits = c(75, 100), expand = c(0, 0), labels = scales::percent_format(scale = 1)) +
+  scale_x_discrete(limits = c("Apr19Jun19", "Jul19Sep19", "Oct19Dec19", "Jan20Mar20", "Apr20Jun20", "Jul20Sep20", "Oct20Dec20", "Jan21Mar21", "Apr21Jun21", "Jul21Sep21","Oct21Dec21", "Jan22Mar22", "Apr22Jun22", "Jul22Sep22", "Oct22Dec22", "Jan23Mar23",
+                              "Apr23Jun23", "Jul23Sep23", "Oct23Dec23", "Jan24Mar24",
+                              "Apr24Jun24", "Jul24Sep24", "Oct24Dec24"
+                              ))
+
+ggsave(paste(Sys.Date(),"Uptake_mean_Lineplot_2groups.jpeg",sep="_"),width=12, height=10,dpi=450)
+
+
 ```
 
 #Plot the SII values for each annual period with error bars
